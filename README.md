@@ -13,6 +13,10 @@ A collection of custom indicators and tools for [vectorbt](https://github.com/po
 ```bash
 pip install vbt-extensions
 ```
+Or, to install directly from GitHub:
+```bash
+pip install git+https://github.com/gabrielbioinfo/vbt_extensions.git
+```
 Or, if using `uv`:
 ```bash
 uv pip install vbt-extensions
