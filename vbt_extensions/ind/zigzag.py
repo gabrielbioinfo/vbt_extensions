@@ -83,9 +83,9 @@ def _apply_func(
     return _zigzag_1d(high, low, float(upper), float(lower))
 
 
-ZIGZAG = vbt.IndicatorFactory(
-    class_name="ZIGZAG",
-    short_name="ZZ",
+zigzag = vbt.IndicatorFactory(
+    class_name="zigzag",
+    short_name="zz",
     input_names=["high", "low"],
     param_names=["upper", "lower"],
     output_names=["zigzag", "is_top", "is_bottom"],

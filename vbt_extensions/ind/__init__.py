@@ -3,6 +3,6 @@
 This package provides indicator modules for use with vbt_extensions.
 """
 
-from .zigzag import ZIGZAG
+from .zigzag import zigzag
 
-__all__ = ["ZIGZAG"]
+__all__ = ["zigzag"]

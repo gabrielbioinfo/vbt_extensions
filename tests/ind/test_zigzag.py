@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import vectorbt as vbt
 
-from vbt_extensions.ind import ZIGZAG
+from vbt_extensions.ind import zigzag
 
 
 def test_zigzag_vectorbt() -> None:
@@ -17,7 +17,7 @@ def test_zigzag_vectorbt() -> None:
         "close": np.array([1, 1.8, 2.7, 2.1, 1.2, 2.1, 2.9, 2.2, 1.1], dtype=np.float64),
     })
 
-    zz = ZIGZAG.run(
+    zz = zigzag.run(
         high=df["high"].to_numpy(dtype=np.float64),
         low=df["low"].to_numpy(dtype=np.float64),
         upper=0.5,
@@ -35,7 +35,7 @@ def test_zigzag_vectorbt() -> None:
     stats = pf.stats()
     assert isinstance(stats, pd.Series)
 
-    zz = ZIGZAG.run(high=df["high"], low=df["low"], upper=0.5, lower=0.5)
+    zz = zigzag.run(high=df["high"], low=df["low"], upper=0.5, lower=0.5)
     zig = zz.zigzag
     tops = zz.is_top.astype(bool)
     bots = zz.is_bottom.astype(bool)

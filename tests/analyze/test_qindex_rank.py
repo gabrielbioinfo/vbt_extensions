@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from vbt_extensions.analyze.qindex_rank import PriceBenchmarkRequiredError, qindex_rank
+from vbt_extensions.analyzers.qindex_rank import PriceBenchmarkRequiredError, qindex_rank
 
 
 class DummyPortfolio:
