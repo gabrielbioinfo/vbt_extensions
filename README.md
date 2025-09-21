@@ -77,6 +77,12 @@ pytest
 
 Feel free to open issues or submit pull requests for new indicators or improvements!
 
+## References & Inspiration
+
+- Neurotrader YouTube channel: [https://www.youtube.com/@neurotrader888/videos](https://www.youtube.com/@neurotrader888/videos)
+- Neurotrader strategy video: [https://www.youtube.com/watch?v=X31hyMhB-3s](https://www.youtube.com/watch?v=X31hyMhB-3s)
+- Academic article: "Flexible Time Series Pattern Matching Based on Perceptually Important Points" by Fu Lai Korris Chung, T.C. Fu, Wing Pong Robert Luk, Vincent To Yee Ng ([link](https://research.polyu.edu.hk/en/publications/flexible-time-series-pattern-matching-based-on-perceptually-impor))
+
 ## License
 
 MIT
