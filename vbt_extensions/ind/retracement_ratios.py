@@ -7,8 +7,8 @@ try:
     from numba import njit
 except ImportError:
 
-    def njit(*args, **kwargs):
-        def deco(f):
+    def njit(*args, **kwargs):  # noqa: ANN002, ANN003, ANN201, ARG001, D103
+        def deco(f):  # noqa: ANN001, ANN202
             return f
 
         return deco
