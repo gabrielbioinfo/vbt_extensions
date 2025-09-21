@@ -1,0 +1,102 @@
+[project]
+name = "vbt-extensions"
+authors = [
+    { name = "Gabriel Lira", email = "gabrielbioinfo@gmail.com" },
+]
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numba>=0.62.0",
+    "numpy>=2.3.3",
+    "pandas>=2.3.2",
+    "pytest>=8.4.2",
+    "ruff>=0.13.1",
+    "vectorbt>=0.28.1",
+]
+
+[tool.ruff]
+select = [
+    "A",     # flake8-builtins
+    "AIR",   # Airflow
+    "ARG",   # flake8-unused-arguments
+    "ASYNC", # flake8 async
+    "B",     # Bugbear: security warnings
+    "BLE",   # flake8-blind-except
+    "C4",    # flake8-comprehensions
+    "C90",   # mccabe - complexity
+    "COM",   # flake8-commas
+    "D",     # pydocstyle
+    "DOC",   # pydoclint
+    "DTZ",   # flake8-datetimez
+    "E",     # pycodestyle errors
+    "EM",    # flake8-errmsg
+    "ERA",   # flake8-eradicate
+    "F",     # pyflakes
+    "FIX",   # flake8-fixme
+    "FBT",   # flake8-boolean-trap
+    "FAST",  # FastAPI
+    "FA",    # flake8-future-annotations
+    "FLY",   # flynt
+    "FURB",  # refurbishing Python codebases
+    "G",     # flake8-logging-format
+    "I",     # isort
+    "ICN",   # flake8-import-conventions
+    "ISC",   # flake8-implicit-str-concat
+    "LOG",   # flake8-logging
+    "N",     # pep8-naming
+    "NPY",   # Numpy
+    "PD",    # pandas
+    "PERF",  # Perflint
+    "PIE",   # flake8-pie
+    "PL",    # Pylint
+    "PT",    # flake8-pytest-style
+    "PTH",   # flake8-use-pathlib
+    "PYI",   # flake8-pyi
+    "Q",     # flake8-quotes
+    "RET",   # flake8-return
+    "RSE",   # flake8-raise
+    "RUF",   # ruff developer rules
+    "S",     # flake8 bandit rules
+    "SIM",   # flake8-simplify
+    "SLF",   # flake8-self
+    "T10",   # flake8-debugger
+    "T20",   # flake8-print
+    "TC",    # flake8-type-checking
+    "TD",    # flake8-todos
+    "TID",   # flake8-tidy-imports
+    "TRY",   # tryceratops
+    "UP",    # pyupgrade
+    "W",     # pycodestyle warnings
+]
+
+line-length = 110
+ignore = ["E501", "PIE790", "PT001", "RET504", "PLR0913", "D401"]
+
+# https://docs.astral.sh/ruff/rules/
+
+fixable = [
+    "COM812",
+    "D205",
+    "D212",
+    "D413",
+    "ERA001",
+    "F401",
+    "F841",
+    "FBT002",
+    "G004",
+    "I",
+    "N803",
+    "NPY001",  # Fix numpy types, which are removed in 1.24.
+    "PLR2004",
+    "PTH100",
+    "Q000",
+    "RET502",
+    "RUF100",
+    "W293",
+]
+
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/*" = ["S101", "F811", "F841", "SLF001", "PLR2004", "PLR0915"]
