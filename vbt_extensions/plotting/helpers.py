@@ -519,3 +519,64 @@ def plot_fib_zones(
 #     title="Fibonacci Zones (38.2–61.8, 23.6–38.2)"
 # )
 # fig.show()
+
+def plot_structure(
+    close: pd.Series,
+    *,
+    swing_high: pd.Series,
+    swing_low: pd.Series,
+    bos_up: pd.Series | None = None,
+    bos_down: pd.Series | None = None,
+    choch_up: pd.Series | None = None,
+    choch_down: pd.Series | None = None,
+    title: str = "Market Structure",
+    fig=None,
+):
+    close = ensure_series(close, "close").astype(float)
+    sh = ensure_series(swing_high, "swing_high").reindex_like(close)
+    sl = ensure_series(swing_low, "swing_low").reindex_like(close)
+
+    fig = plot_price(close, title=title, fig=fig)
+    fig = sh.vbt.plot(fig=fig, trace_kwargs=dict(name="Swing High"))
+    fig = sl.vbt.plot(fig=fig, trace_kwargs=dict(name="Swing Low"))
+
+    def add_marks(mask, name, symbol):
+        if mask is None: return
+        m = ensure_series(mask, name).reindex_like(close).fillna(False)
+        idx = m[m].index
+        if len(idx) > 0:
+            fig.add_scatter(x=idx, y=close.loc[idx], mode="markers", name=name, marker_symbol=symbol)
+
+    add_marks(bos_up, "BOS↑", "triangle-up")
+    add_marks(bos_down, "BOS↓", "triangle-down")
+    add_marks(choch_up, "CHOCH↑", "diamond")
+    add_marks(choch_down, "CHOCH↓", "diamond-open")
+    return fig
+
+
+def plot_fvg(
+    close: pd.Series,
+    *,
+    fvg_up_lower: pd.Series,
+    fvg_up_upper: pd.Series,
+    fvg_dn_lower: pd.Series,
+    fvg_dn_upper: pd.Series,
+    title: str = "Fair Value Gaps",
+    opacity: float = 0.2,
+    fig=None,
+):
+    close = ensure_series(close, "close").astype(float)
+
+    fig = plot_price(close, title=title, fig=fig)
+
+    def band(upper: pd.Series, lower: pd.Series, name: str):
+        up = ensure_series(upper, f"{name}_up").reindex_like(close)
+        lo = ensure_series(lower, f"{name}_lo").reindex_like(close)
+        fig = plot_band(up, lo, fig=fig, name=name)
+        # deixar levemente translúcido
+        fig.data[-1].update(opacity=opacity)  # filled trace
+        return fig
+
+    fig = band(fvg_up_upper, fvg_up_lower, "FVG Up")
+    fig = band(fvg_dn_upper, fvg_dn_lower, "FVG Down")
+    return fig
