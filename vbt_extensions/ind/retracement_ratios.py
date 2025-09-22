@@ -1,51 +1,150 @@
-"""Retracement ratios indicator for use with vectorbt."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
-import vectorbt as vbt
-
-try:
-    from numba import njit
-except ImportError:
-
-    def njit(*args, **kwargs):  # noqa: ANN002, ANN003, ANN201, ARG001, D103
-        def deco(f):  # noqa: ANN001, ANN202
-            return f
-
-        return deco
+import pandas as pd
 
 
-@njit(cache=True)
-def _retracement_ratios_1d(ext_p: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    n = ext_p.shape[0]
-    seg_height = np.empty(n, dtype=np.float64)
-    seg_height[:] = np.nan
-    retrace_ratio = np.empty(n, dtype=np.float64)
-    retrace_ratio[:] = np.nan
-    log_retrace_ratio = np.empty(n, dtype=np.float64)
-    log_retrace_ratio[:] = np.nan
-    for i in range(1, n):
-        seg_height[i] = np.abs(ext_p[i] - ext_p[i - 1])
-        if i > 1 and seg_height[i - 1] != 0:
-            retrace_ratio[i] = seg_height[i] / seg_height[i - 1]
-            if retrace_ratio[i] > 0:
-                log_retrace_ratio[i] = np.log(retrace_ratio[i])
-    return seg_height, retrace_ratio, log_retrace_ratio
+@dataclass
+class RetracementResult:
+    # Base da perna (valores)
+    swing_high: pd.Series
+    swing_low: pd.Series
+    # Índice (pos) do último topo/fundo conhecido até t (útil p/ debugging/plots)
+    last_top_pos: pd.Series
+    last_bottom_pos: pd.Series
+    # Direção da perna ativa: +1 = up (de low->high), -1 = down (de high->low)
+    direction: pd.Series
+    # Níveis de Fibo dentro de [low, high] (fib_0 .. fib_100) e extensões >100
+    fib_levels: pd.DataFrame  # colunas ex.: fib_0, fib_23.6, ..., fib_100
+    ext_levels: pd.DataFrame | None  # colunas ex.: ext_127.2, ext_161.8 (pode ser None)
 
 
-def _apply_func(ext_p: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    ext_p = np.asarray(ext_p, dtype=np.float64)
-    if ext_p.ndim > 1:
-        ext_p = ext_p.ravel()
-    return _retracement_ratios_1d(ext_p)
+def _last_true_pos(mask: pd.Series) -> pd.Series:
+    """Retorna, a cada t, a posição (0..n-1) do último True visto até t; NaN se não houve."""
+    # Convertemos True em índices inteiros, NaN caso contrário; depois ffill do 'running max'
+    idx_pos = pd.Series(np.arange(len(mask), dtype=float), index=mask.index)
+    pos = idx_pos.where(mask, np.nan).ffill()
+    return pos
 
 
-retracement_ratios = vbt.IndicatorFactory(
-    class_name="retracement_ratios",
-    short_name="rr",
-    input_names=["ext_p"],
-    param_names=[],
-    output_names=["seg_height", "retrace_ratio", "log_retrace_ratio"],
-).from_apply_func(
-    _apply_func,
-    keep_pd=True,
-)
+def _build_fib_levels_for_leg(
+    low: pd.Series,
+    high: pd.Series,
+    direction_up: pd.Series,
+    ratios: List[float],
+    ext: Optional[List[float]],
+) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+    """Calcula níveis por barra, respeitando a direção da perna ativa."""
+    # garantias
+    low = low.astype(float)
+    high = high.astype(float)
+    direction_up = direction_up.astype(bool)
+
+    # dentro do range [low, high]
+    # - up-leg (low->high): fib_r = high - r*(high-low)
+    # - down-leg (high->low): fib_r = low + r*(high-low)
+    rng = (high - low).astype(float)
+
+    fib_cols: Dict[str, pd.Series] = {}
+    for r in ratios:
+        name = f"fib_{round(r * 100, 1):g}".replace(".0", "")
+        up_val = high - r * rng
+        dn_val = low + r * rng
+        fib_cols[name] = np.where(direction_up, up_val, dn_val)
+
+    # sempre incluímos 0% e 100% para referência
+    fib_cols.setdefault("fib_0", np.where(direction_up, high, low))  # alvo da perna
+    fib_cols.setdefault("fib_100", np.where(direction_up, low, high))  # origem da perna
+
+    fib_df = pd.DataFrame(fib_cols, index=low.index).astype(float)
+
+    # ordenar colunas numericamente pelo percentual (garante consistência)
+    def k(c: str) -> float:
+        if c.startswith("fib_"):
+            return float(c.split("_")[1])
+        return 9999.0
+
+    fib_df = fib_df[sorted(fib_df.columns, key=k)]
+
+    ext_df = None
+    if ext and len(ext) > 0:
+        ext_cols: Dict[str, pd.Series] = {}
+        # extensões:
+        # - up-leg: ext_k = high + (k-1)*rng
+        # - down-leg: ext_k = low - (k-1)*rng
+        for kext in ext:
+            name = f"ext_{kext}"
+            up_val = high + (kext - 1.0) * rng
+            dn_val = low - (kext - 1.0) * rng
+            ext_cols[name] = np.where(direction_up, up_val, dn_val)
+        ext_df = pd.DataFrame(ext_cols, index=low.index).astype(float)
+
+    return fib_df, ext_df
+
+
+class FIB_RETRACEMENT:
+    """Fibonacci retracements a partir de pivôs (is_top/is_bottom) — pandas-first.
+
+    Requer:
+      - close : Série de fechamento (para alinhamento/plots)
+      - swing_high, swing_low : Séries com últimos pivôs (ffilladas), vindas de ZigZag/Peaks/etc.
+      - is_top, is_bottom : flags booleanas de pivô no candle (mesmo index)
+
+    A perna ativa é determinada pela RECÊNCIA dos pivôs:
+      - se o último evento recente foi 'top'  -> perna down (high->low)
+      - se o último evento recente foi 'bottom' -> perna up (low->high)
+
+    Os níveis são sempre calculados dentro do range (low, high) da perna ativa naquele t.
+
+    Parâmetros:
+      ratios: níveis de retração (0..1, exceto 0/1 que são acrescentados automaticamente)
+      ext   : extensões (>1.0), ex.: [1.272, 1.618]
+    """
+
+    @staticmethod
+    def run(
+        close: pd.Series,
+        swing_high: pd.Series,
+        swing_low: pd.Series,
+        is_top: pd.Series,
+        is_bottom: pd.Series,
+        *,
+        ratios: Iterable[float] = (0.236, 0.382, 0.5, 0.618, 0.786),
+        ext: Optional[Iterable[float]] = (1.272, 1.618),
+    ) -> RetracementResult:
+        # validações/alinhos
+        close = close.astype(float)
+        swing_high = swing_high.reindex_like(close).astype(float)
+        swing_low = swing_low.reindex_like(close).astype(float)
+        is_top = is_top.reindex_like(close).fillna(False).astype(bool)
+        is_bottom = is_bottom.reindex_like(close).fillna(False).astype(bool)
+
+        ratios = list(ratios)
+        ext = list(ext) if ext is not None else None
+
+        # recência dos pivôs (posições numéricas cumulativas)
+        last_top_pos = _last_true_pos(is_top)
+        last_bottom_pos = _last_true_pos(is_bottom)
+
+        # direção da perna ativa
+        # regra: se topo é mais recente que fundo -> perna DOWN; senão UP
+        direction_up = last_bottom_pos >= last_top_pos  # bool
+        direction = pd.Series(np.where(direction_up, 1, -1), index=close.index)
+
+        # níveis: usamos o par (low, high) ffill atual
+        fib_df, ext_df = _build_fib_levels_for_leg(
+            low=swing_low, high=swing_high, direction_up=direction_up, ratios=ratios, ext=ext
+        )
+
+        return RetracementResult(
+            swing_high=swing_high,
+            swing_low=swing_low,
+            last_top_pos=last_top_pos,
+            last_bottom_pos=last_bottom_pos,
+            direction=direction,
+            fib_levels=fib_df,
+            ext_levels=ext_df,
+        )

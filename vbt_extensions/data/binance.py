@@ -1,148 +1,136 @@
-"""Functions for downloading data from Binance."""
+# vbt_extensions/data/binance.py
+"""Binance OHLCV loader (pandas-first) built on top of vbt_extensions.data.base."""
 
-import time
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import Optional
 
 import pandas as pd
 import vectorbt as vbt
-from binance.client import Client
+
+from .base import (
+    BaseDownloadParams,
+    backoff_sleep,
+    drop_partial_last_candle,
+    ensure_tz_aware,
+    fix_gaps,
+    maybe_resample,
+    register_loader,
+    validate_and_cast,
+)
+
+try:
+    # Tipos/exceções do python-binance (se instalado)
+    from binance.client import Client  # type: ignore
+    from binance.error import BinanceAPIException, BinanceRequestException  # type: ignore
+except Exception:  # pacote pode não estar disponível no ambiente
+    Client = object  # fallback para typing
+    BinanceAPIException = tuple()  # type: ignore
+    BinanceRequestException = tuple()  # type: ignore
 
 
-def _ensure_tz_aware(df: pd.DataFrame, tz: str) -> pd.DataFrame:
-    idx = df.index
-    if idx.tz is None:
-        df.index = idx.tz_localize("UTC")
-    if tz:
-        df = df.tz_convert(tz)
-    return df
-
-
-def _fix_gaps(df: pd.DataFrame, interval: str, how: str = "ffill") -> pd.DataFrame:
-    freq_map = {
-        "1m": "1min",
-        "3m": "3min",
-        "5m": "5min",
-        "15m": "15min",
-        "30m": "30min",
-        "1h": "1H",
-        "2h": "2H",
-        "4h": "4H",
-        "6h": "6H",
-        "8h": "8H",
-        "12h": "12H",
-        "1d": "1D",
-    }
-    freq = freq_map.get(interval)
-    if freq is None:
-        return df
-    full_idx = pd.date_range(df.index.min(), df.index.max(), freq=freq, tz=df.index.tz)
-    df = df.reindex(full_idx)
-    if how == "ffill":
-        df = df.ffill()
-    elif how == "bfill":
-        df = df.bfill()
-    return df
+# --------------------- Params & Error ---------------------
 
 
 @dataclass
-class BinanceDownloadParams:
-    """Parameters for downloading OHLCV data from Binance.
+class BinanceDownloadParams(BaseDownloadParams):
+    """Params para Binance (extende BaseDownloadParams).
 
-    Attributes
-    ----------
-    client : Client
-        Binance API client instance.
-    ticker : str
-        Symbol to download (e.g., 'BTCUSDT').
-    interval : str
-        Data interval (e.g., '1h').
-    start : str
-        Start time for data download.
-    end : str | None
-        End time for data download.
-    tz : str
-        Timezone for returned data. ex: 'UTC', 'America/Sao_Paulo'.
-    retries : int
-        Number of download retries on failure.
-    sleep_sec : float
-        Seconds to sleep between retries.
-    fill_gaps : bool
-        Whether to fill missing time intervals in the data.
-
+    Campos herdados (principais):
+      - symbol: ex. "BTCUSDT"
+      - interval: ex. "1h"
+      - start/end: ex. "1 year ago UTC"
+      - tz, retries, sleep_sec, fill_gaps, drop_partial_last, resample_to, freq_map
     """
 
-    client: Client
-    ticker: str
-    interval: str = "1h"
-    start: str = "1 year ago UTC"
-    end: str | None = None
-    tz: str = "UTC"
-    retries: int = 3
-    sleep_sec: float = 1.5
-    fill_gaps: bool = True
+    client: Client | None = None  # obrigatório na prática
 
 
 class BinanceDownloadError(RuntimeError):
-    """Custom exception raised when Binance data download fails after all retries."""
+    """Erro quando falha após todas as tentativas."""
 
-    def __init__(self, ticker: str, last_err: Exception) -> None:
-        """Initialize BinanceDownloadError with ticker and last error.
+    def __init__(self, symbol: str, last_err: Exception) -> None:
+        super().__init__(f"Failed to load {symbol}: {last_err!r}")
 
-        Parameters
-        ----------
-        ticker : str
-            The ticker symbol that failed to load.
-        last_err : Exception
-            The last exception encountered during download.
 
-        """
-        msg = f"Failed to load {ticker}: {last_err}"
-        super().__init__(msg)
+# --------------------- Loader principal ---------------------
 
 
 def binance_download(params: BinanceDownloadParams) -> pd.DataFrame:
-    """Download OHLCV data from Binance using vectorbt, with options for timezone, retries, and gap filling.
+    """Baixa OHLCV da Binance via vectorbt, aplicando normalizações do 'base'."""
+    if params.client is None:
+        raise ValueError("BinanceDownloadParams.client não pode ser None.")
 
-    Parameters
-    ----------
-    params : BinanceDownloadParams
-        Parameters for the Binance data download.
+    last_err: Optional[Exception] = None
 
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame containing columns: Open, High, Low, Close, Volume.
-
-    Raises
-    ------
-    BinanceDownloadError
-        If data download fails after all retries.
-
-    """
-    last_err = None
-    for _ in range(params.retries):
+    for attempt in range(1, params.retries + 1):
         try:
-            data = vbt.BinanceData.download(
-                params.ticker,
+            raw = vbt.BinanceData.download(
+                params.symbol,
                 client=params.client,
                 interval=params.interval,
                 start=params.start,
                 end=params.end,
             ).get()
-            # padroniza nomes e tipos
-            cols = {c: c.capitalize() for c in data.columns}  # open->Open etc
-            data = data.rename(columns=cols).sort_index()
-            data = _ensure_tz_aware(data, params.tz)
+
+            df = validate_and_cast(raw)
+            df = ensure_tz_aware(df, params.tz)
+
             if params.fill_gaps:
-                data = _fix_gaps(data, params.interval, how="ffill")
-            # garante numéricos
-            for c in ["Open", "High", "Low", "Close", "Volume"]:
-                if c in data:
-                    data[c] = pd.to_numeric(data[c], errors="coerce")
-            return data[["Open", "High", "Low", "Close", "Volume"]]
+                df = fix_gaps(df, params.interval, freq_map=params.freq_map, how="ffill")
+
+            if params.drop_partial_last:
+                df = drop_partial_last_candle(df, params.interval, freq_map=params.freq_map)
+
+            if params.resample_to:
+                df = maybe_resample(df, params.resample_to)
+
+            # metadados úteis
+            df.attrs.update(
+                source="binance",
+                symbol=params.symbol,
+                interval=params.interval,
+                tz=params.tz,
+            )
+            return df
+
         except (ConnectionError, TimeoutError, ValueError) as e:
             last_err = e
-            time.sleep(params.sleep_sec)
+        except BinanceRequestException as e:  # type: ignore[misc]
+            last_err = e
+        except BinanceAPIException as e:  # type: ignore[misc]
+            last_err = e
+        except Exception as e:
+            last_err = e
 
-    err_msg = BinanceDownloadError(params.ticker, last_err)
-    raise err_msg
+        backoff_sleep(params.sleep_sec, attempt)
+
+    raise BinanceDownloadError(params.symbol, last_err or RuntimeError("unknown error"))
+
+
+# --------------------- Registry ---------------------
+
+
+def _factory(p: BaseDownloadParams) -> pd.DataFrame:
+    # Adaptador para o registry aceitar BaseDownloadParams
+    bp = BinanceDownloadParams(**p.__dict__)  # copia campos comuns
+    if getattr(p, "client", None) is None:
+        raise ValueError("Para loader 'binance', é necessário fornecer 'client' em params.")
+    bp.client = getattr(p, "client")
+    return binance_download(bp)
+
+
+register_loader("binance", _factory)
+
+
+# from binance.client import Client
+# from vbt_extensions.data.base import load_ohlcv, BaseDownloadParams
+
+# client = Client(api_key="...", api_secret="...")
+# df = load_ohlcv("binance", BaseDownloadParams(
+#     symbol="BTCUSDT",
+#     interval="1h",
+#     start="1 year ago UTC",
+#     tz="America/Sao_Paulo",
+# ))

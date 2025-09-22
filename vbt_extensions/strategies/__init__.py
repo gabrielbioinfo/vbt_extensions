@@ -1,20 +1,6 @@
-"""Strategies package for vbt_extensions.
+"""Exemplos de estratégias simples para estudo."""
 
-This package provides strategy implementations for use with vbt_extensions.
-"""
+from .signal_golden_cross import golden_cross_strategy
+from .signal_random import random_strategy
 
-from .signal_golden_cross import (
-    ModeMissingListError,
-    ModeRequiredError,
-    StyleRequiredError,
-    signal_golden_cross,
-)
-from .signal_random import signal_random
-
-__all__ = [
-    "ModeMissingListError",
-    "ModeRequiredError",
-    "StyleRequiredError",
-    "signal_golden_cross",
-    "signal_random",
-]
+__all__ = ["golden_cross_strategy", "random_strategy"]

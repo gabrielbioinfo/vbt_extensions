@@ -1,7 +1,4 @@
-"""Analyze package for vbt_extensions.
-
-This package provides analysis tools for vbt_extensions.
-"""
+"""Analisadores de portfólio e estratégias."""
 
 from .qindex_rank import qindex_rank
 

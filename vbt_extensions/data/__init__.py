@@ -1,5 +1,6 @@
-"""Data utilities for vbt_extensions."""
+"""Fontes de dados para usar no Quant Lab (ex.: Binance)."""
 
-from .binance import binance_download
+from .base import DataSource
+from .binance import BinanceDownloadError, BinanceDownloadParams, binance_download
 
-__all__ = ["binance_download"]
+__all__ = ["DataSource", "BinanceDownloadParams", "BinanceDownloadError", "binance_download"]

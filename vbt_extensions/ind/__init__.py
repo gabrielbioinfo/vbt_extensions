@@ -1,8 +1,18 @@
-"""Indicators package for vbt_extensions.
+"""Indicadores customizados para vectorbt."""
 
-This package provides indicator modules for use with vbt_extensions.
-"""
+from .directional_change import DIRECTIONAL_CHANGE
+from .perceptually_important import PIP
+from .retracement_ratios import FIB_RETRACEMENT
+from .trend_line import TREND_LINE
+from .zigzag import ZIGZAG
 
-from .zigzag import zigzag
+# outros indicadores ficam disponíveis mas não padronizados em classe
+# (rolling_pivots, supports_resistances, head_and_shoulders, etc.)
 
-__all__ = ["zigzag"]
+__all__ = [
+    "ZIGZAG",
+    "DIRECTIONAL_CHANGE",
+    "PIP",
+    "FIB_RETRACEMENT",
+    "TREND_LINE",
+]

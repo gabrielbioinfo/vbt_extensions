@@ -1,82 +1,81 @@
-"""Directional Change indicator for use with vectorbt."""
+# vbt_extensions/ind/directional_change.py
+from dataclasses import dataclass
 
-import numpy as np
-import vectorbt as vbt
-
-try:
-    from numba import njit
-except ImportError:
-
-    def njit(*args, **kwargs):  # noqa: ANN002, ANN003, ANN201, ARG001, D103
-        def deco(f):  # noqa: ANN001, ANN202
-            return f
-
-        return deco
+import pandas as pd
 
 
-@njit(cache=True)
-def _directional_change_1d(
-    close: np.ndarray,
-    high: np.ndarray,
-    low: np.ndarray,
-    sigma: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    n = close.shape[0]
-    is_top = np.zeros(n, dtype=np.float64)
-    is_bottom = np.zeros(n, dtype=np.float64)
-    up_zig = True
-    tmp_max = high[0]
-    tmp_min = low[0]
-    tmp_max_i = 0
-    tmp_min_i = 0
-    for i in range(n):
-        if up_zig:
-            if high[i] > tmp_max:
-                tmp_max = high[i]
-                tmp_max_i = i
-            elif close[i] < tmp_max - tmp_max * sigma:
-                is_top[tmp_max_i] = 1.0
-                up_zig = False
-                tmp_min = low[i]
-                tmp_min_i = i
-        else:  # noqa: PLR5501
-            if low[i] < tmp_min:
-                tmp_min = low[i]
-                tmp_min_i = i
-            elif close[i] > tmp_min + tmp_min * sigma:
-                is_bottom[tmp_min_i] = 1.0
-                up_zig = True
-                tmp_max = high[i]
-                tmp_max_i = i
-    return is_top, is_bottom
+@dataclass
+class DCResult:
+    dc_event: pd.Series  # +1: pivô topo, -1: pivô fundo, 0: nenhum
+    dc_price: pd.Series  # preço no evento DC (NaN fora)
+    swing_high: pd.Series  # último topo DC conhecido
+    swing_low: pd.Series  # último fundo DC conhecido
 
 
-def _apply_func(
-    close: np.ndarray,
-    high: np.ndarray,
-    low: np.ndarray,
-    sigma: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    close = np.asarray(close, dtype=np.float64)
-    high = np.asarray(high, dtype=np.float64)
-    low = np.asarray(low, dtype=np.float64)
-    if close.ndim > 1:
-        close = close.ravel()
-    if high.ndim > 1:
-        high = high.ravel()
-    if low.ndim > 1:
-        low = low.ravel()
-    return _directional_change_1d(close, high, low, float(sigma))
+class DIRECTIONAL_CHANGE:
+    """
+    Directional Change (DC) por limiar percentual delta.
+    - Marca eventos quando há reversão >= delta a partir do último extremo.
+    - Alterna entre regimes "subida" e "descida" (intrinsic time).
+    """
 
+    @staticmethod
+    def run(
+        close: pd.Series,
+        *,
+        delta: float = 0.01,  # 1% por padrão
+        use_pct: bool = True,  # se False, trata delta em preço absoluto
+    ) -> DCResult:
+        if not isinstance(close, pd.Series):
+            raise TypeError("close deve ser pd.Series")
 
-directional_change = vbt.IndicatorFactory(
-    class_name="directional_change",
-    short_name="dc",
-    input_names=["close", "high", "low"],
-    param_names=["sigma"],
-    output_names=["is_top", "is_bottom"],
-).from_apply_func(
-    _apply_func,
-    sigma=0.02,
-    keep_pd=True,
-)
+        c = close.astype(float)
+        n = len(c)
+        if n == 0:
+            empty = pd.Series(dtype=float, index=c.index)
+            empty_b = pd.Series(dtype=bool, index=c.index)
+            return DCResult(empty_b.astype(int), empty, empty, empty)
+
+        # Estado
+        trend = 0  # +1 up, -1 down, 0 unknown
+        last_ext_i = 0
+        last_ext_p = c.iloc[0]
+
+        dc_flag = pd.Series(0, index=c.index, dtype=int)
+        dc_price = pd.Series(pd.NA, index=c.index, dtype="float")
+
+        for i in range(1, n):
+            px = c.iat[i]
+
+            def rel_change(a, b):
+                return (a - b) / b if use_pct else (a - b)
+
+            if trend >= 0:
+                # acompanhando alta (ou indefinido)
+                if px > last_ext_p:
+                    last_ext_p = px
+                    last_ext_i = i
+                elif rel_change(last_ext_p, px) >= (delta if use_pct else delta):
+                    # reversão para baixo >= delta -> evento topo
+                    dc_flag.iat[last_ext_i] = 1
+                    dc_price.iat[last_ext_i] = last_ext_p
+                    trend = -1
+                    last_ext_p = px
+                    last_ext_i = i
+            if trend <= 0:
+                # acompanhando baixa (ou indefinido)
+                if px < last_ext_p:
+                    last_ext_p = px
+                    last_ext_i = i
+                elif rel_change(px, last_ext_p) >= (delta if use_pct else delta):
+                    # reversão para cima >= delta -> evento fundo
+                    dc_flag.iat[last_ext_i] = -1
+                    dc_price.iat[last_ext_i] = last_ext_p
+                    trend = 1
+                    last_ext_p = px
+                    last_ext_i = i
+
+        swing_high = dc_price.where(dc_flag.eq(1)).ffill()
+        swing_low = dc_price.where(dc_flag.eq(-1)).ffill()
+
+        return DCResult(dc_event=dc_flag, dc_price=dc_price, swing_high=swing_high, swing_low=swing_low)
