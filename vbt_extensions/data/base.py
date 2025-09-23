@@ -13,7 +13,7 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional, Protocol
+from typing import Callable, Protocol
 
 import pandas as pd
 
@@ -53,16 +53,16 @@ class BaseDownloadParams:
 
     symbol: str
     interval: str = "1h"
-    start: Optional[str] = "1 year ago UTC"
-    end: Optional[str] = None
+    start: str | None = "1 year ago UTC"
+    end: str | None = None
     tz: str = "UTC"
     retries: int = 3
     sleep_sec: float = 1.5
     fill_gaps: bool = True
     drop_partial_last: bool = True
-    resample_to: Optional[str] = None
+    resample_to: str | None = None
     # freq_map allows per-loader overrides
-    freq_map: Optional[dict] = None
+    freq_map: dict | None = None
 
 
 # ------------------------- Protocol (contract) -------------------------
@@ -79,7 +79,7 @@ class DataLoader(Protocol):
 # ------------------------- Shared helpers -------------------------
 
 
-def ensure_tz_aware(df: pd.DataFrame, tz: Optional[str]) -> pd.DataFrame:
+def ensure_tz_aware(df: pd.DataFrame, tz: str | None) -> pd.DataFrame:
     idx = df.index
     if idx.tz is None:
         df.index = idx.tz_localize("UTC")
@@ -101,7 +101,7 @@ def validate_and_cast(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def fix_gaps(
-    df: pd.DataFrame, interval: str, freq_map: Optional[dict] = None, how: str = "ffill"
+    df: pd.DataFrame, interval: str, freq_map: dict | None = None, how: str = "ffill"
 ) -> pd.DataFrame:
     fmap = freq_map or DEFAULT_TO_PD_FREQ
     freq = fmap.get(interval)
@@ -117,7 +117,7 @@ def fix_gaps(
 
 
 def drop_partial_last_candle(
-    df: pd.DataFrame, interval: str, freq_map: Optional[dict] = None
+    df: pd.DataFrame, interval: str, freq_map: dict | None = None
 ) -> pd.DataFrame:
     if df.empty:
         return df
@@ -136,7 +136,7 @@ def drop_partial_last_candle(
     return df
 
 
-def maybe_resample(df: pd.DataFrame, target_freq: Optional[str]) -> pd.DataFrame:
+def maybe_resample(df: pd.DataFrame, target_freq: str | None) -> pd.DataFrame:
     if not target_freq or df.empty:
         return df
     ohlc = {
@@ -159,7 +159,7 @@ def backoff_sleep(base: float, attempt: int) -> None:
 # ------------------------- Optional registry -------------------------
 
 LoaderFactory = Callable[[BaseDownloadParams], pd.DataFrame]
-_LOADER_REGISTRY: Dict[str, LoaderFactory] = {}
+_LOADER_REGISTRY: dict[str, LoaderFactory] = {}
 
 
 def register_loader(name: str, factory: LoaderFactory) -> None:

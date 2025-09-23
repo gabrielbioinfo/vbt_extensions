@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     import pandas as pd
 
 import vectorbt as vbt
+from binance.client import Client
 
 from vbt_extensions.data.base import (
     BaseDownloadParams,
@@ -20,13 +21,6 @@ from vbt_extensions.data.base import (
     register_loader,
     validate_and_cast,
 )
-
-try:
-    # Tipos/exceções do python-binance (se instalado)
-    from binance.client import Client
-except Exception:  # pacote pode não estar disponível no ambiente
-    Client = object  # fallback para typing
-
 
 # --------------------- Params & Error ---------------------
 
@@ -42,7 +36,7 @@ class BinanceDownloadParams(BaseDownloadParams):
       - tz, retries, sleep_sec, fill_gaps, drop_partial_last, resample_to, freq_map
     """
 
-    client: Optional[Client] = None  # obrigatório na prática
+    client: Client | None = None  # obrigatório na prática
 
 
 class BinanceDownloadError(RuntimeError):
@@ -58,7 +52,6 @@ def binance_download(params: BinanceDownloadParams) -> "pd.DataFrame":
     """Baixa OHLCV da Binance via vectorbt, aplicando normalizações do 'base'."""
     if params.client is None:
         raise ValueError("BinanceDownloadParams.client não pode ser None.")
-        raise ValueError("BinanceDownloadParams.client não pode ser None.")
 
     last_err: Optional[Exception] = None
 
@@ -69,7 +62,7 @@ def binance_download(params: BinanceDownloadParams) -> "pd.DataFrame":
                 client=params.client,
                 interval=params.interval,
                 start=params.start,
-                end=params.end,
+                end=params.end or "now UTC",
             ).get()
 
             df = validate_and_cast(raw)
