@@ -65,18 +65,21 @@ def binance_download(params: BinanceDownloadParams) -> "pd.DataFrame":
                 end=params.end or "now UTC",
             ).get()
 
+
             df = validate_and_cast(raw)
             df = ensure_tz_aware(df, params.tz)
-
+            
             if params.fill_gaps:
                 df = fix_gaps(df, params.interval, freq_map=params.freq_map, how="ffill")
-
+            
             if params.drop_partial_last:
                 df = drop_partial_last_candle(df, params.interval, freq_map=params.freq_map)
 
+            
             if params.resample_to:
                 df = maybe_resample(df, params.resample_to)
 
+            
             # metadados úteis
             df.attrs.update(
                 source="binance",

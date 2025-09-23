@@ -80,11 +80,7 @@ class DataLoader(Protocol):
 
 
 def ensure_tz_aware(df: pd.DataFrame, tz: str | None) -> pd.DataFrame:
-    idx = df.index
-    if idx.tz is None:
-        df.index = idx.tz_localize("UTC")
-    if tz:
-        df = df.tz_convert(tz)
+    df = df.tz_convert(tz)
     return df
 
 
@@ -107,6 +103,7 @@ def fix_gaps(
     freq = fmap.get(interval)
     if not freq or df.empty:
         return df
+    
     full_idx = pd.date_range(df.index.min(), df.index.max(), freq=freq, tz=df.index.tz)
     out = df.reindex(full_idx)
     if how == "ffill":
@@ -130,7 +127,11 @@ def drop_partial_last_candle(
         next_edge = last.floor(freq) + pd.tseries.frequencies.to_offset(freq)
     except Exception:
         return df
-    now = pd.Timestamp.utcnow().tz_localize("UTC").tz_convert(last.tz)
+
+    if not last.tz:
+        return df
+
+    now = pd.Timestamp.utcnow().tz_convert(last.tz)
     if now < next_edge:
         return df.iloc[:-1]
     return df
