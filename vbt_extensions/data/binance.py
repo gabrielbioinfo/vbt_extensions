@@ -1,15 +1,16 @@
 # vbt_extensions/data/binance.py
 """Binance OHLCV loader (pandas-first) built on top of vbt_extensions.data.base."""
 
-from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-import pandas as pd
+if TYPE_CHECKING:
+    import pandas as pd
+
 import vectorbt as vbt
 
-from .base import (
+from vbt_extensions.data.base import (
     BaseDownloadParams,
     backoff_sleep,
     drop_partial_last_candle,
@@ -22,12 +23,9 @@ from .base import (
 
 try:
     # Tipos/exceções do python-binance (se instalado)
-    from binance.client import Client  # type: ignore
-    from binance.error import BinanceAPIException, BinanceRequestException  # type: ignore
+    from binance.client import Client
 except Exception:  # pacote pode não estar disponível no ambiente
     Client = object  # fallback para typing
-    BinanceAPIException = tuple()  # type: ignore
-    BinanceRequestException = tuple()  # type: ignore
 
 
 # --------------------- Params & Error ---------------------
@@ -44,7 +42,7 @@ class BinanceDownloadParams(BaseDownloadParams):
       - tz, retries, sleep_sec, fill_gaps, drop_partial_last, resample_to, freq_map
     """
 
-    client: Client | None = None  # obrigatório na prática
+    client: Optional[Client] = None  # obrigatório na prática
 
 
 class BinanceDownloadError(RuntimeError):
@@ -56,10 +54,10 @@ class BinanceDownloadError(RuntimeError):
 
 # --------------------- Loader principal ---------------------
 
-
-def binance_download(params: BinanceDownloadParams) -> pd.DataFrame:
+def binance_download(params: BinanceDownloadParams) -> "pd.DataFrame":
     """Baixa OHLCV da Binance via vectorbt, aplicando normalizações do 'base'."""
     if params.client is None:
+        raise ValueError("BinanceDownloadParams.client não pode ser None.")
         raise ValueError("BinanceDownloadParams.client não pode ser None.")
 
     last_err: Optional[Exception] = None
@@ -97,10 +95,7 @@ def binance_download(params: BinanceDownloadParams) -> pd.DataFrame:
 
         except (ConnectionError, TimeoutError, ValueError) as e:
             last_err = e
-        except BinanceRequestException as e:  # type: ignore[misc]
-            last_err = e
-        except BinanceAPIException as e:  # type: ignore[misc]
-            last_err = e
+        
         except Exception as e:
             last_err = e
 
@@ -111,13 +106,13 @@ def binance_download(params: BinanceDownloadParams) -> pd.DataFrame:
 
 # --------------------- Registry ---------------------
 
-
-def _factory(p: BaseDownloadParams) -> pd.DataFrame:
+def _factory(p: BaseDownloadParams) -> "pd.DataFrame":
     # Adaptador para o registry aceitar BaseDownloadParams
     bp = BinanceDownloadParams(**p.__dict__)  # copia campos comuns
     if getattr(p, "client", None) is None:
         raise ValueError("Para loader 'binance', é necessário fornecer 'client' em params.")
     bp.client = getattr(p, "client")
+    return binance_download(bp)
     return binance_download(bp)
 
 
