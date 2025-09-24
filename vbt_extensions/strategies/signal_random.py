@@ -30,5 +30,5 @@ def signal_random(close: pd.Series, p: float = 0.02, ncols: int = 1) -> tuple[pd
         columns=pd.MultiIndex.from_tuples(cols, names=["rand"]),
     )
     # exit by crossing with 'shift' (closes on the next bar if entered)
-    exits = entries.shift(1).fillna(value=False)
+    exits = entries.shift(1).fillna(value=False).infer_objects(copy=False)
     return entries, exits

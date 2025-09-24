@@ -1,5 +1,5 @@
 # vbt_extensions/plotting/helpers.py
-from typing import Optional
+
 
 import pandas as pd
 
@@ -13,7 +13,7 @@ def ensure_series(x, name=None) -> pd.Series:
 def plot_price(
     close: pd.Series,
     *,
-    title: Optional[str] = None,
+    title: str | None = None,
     fig=None,
 ):
     """Plota o preço base e retorna a figura (plotly Figure) do vectorbt."""
@@ -71,10 +71,10 @@ def plot_entries_exits(
 def plot_pivots(
     close: pd.Series,
     *,
-    is_top: Optional[pd.Series] = None,
-    is_bottom: Optional[pd.Series] = None,
-    swing_high: Optional[pd.Series] = None,
-    swing_low: Optional[pd.Series] = None,
+    is_top: pd.Series | None = None,
+    is_bottom: pd.Series | None = None,
+    swing_high: pd.Series | None = None,
+    swing_low: pd.Series | None = None,
     fig=None,
     marker_size: int = 6,
 ):
@@ -123,10 +123,10 @@ def plot_pivots(
 def plot_sr_levels(
     close: pd.Series,
     *,
-    support_levels: Optional[pd.Series] = None,
-    resistance_levels: Optional[pd.Series] = None,
-    touches_support: Optional[pd.Series] = None,
-    touches_resist: Optional[pd.Series] = None,
+    support_levels: pd.Series | None = None,
+    resistance_levels: pd.Series | None = None,
+    touches_support: pd.Series | None = None,
+    touches_resist: pd.Series | None = None,
     fig=None,
     touch_marker_size: int = 6,
 ):
@@ -202,19 +202,19 @@ def plot_indicator_tearsheet(
     close: pd.Series,
     *,
     # pivôs
-    is_top: Optional[pd.Series] = None,
-    is_bottom: Optional[pd.Series] = None,
-    swing_high: Optional[pd.Series] = None,
-    swing_low: Optional[pd.Series] = None,
+    is_top: pd.Series | None = None,
+    is_bottom: pd.Series | None = None,
+    swing_high: pd.Series | None = None,
+    swing_low: pd.Series | None = None,
     # S/R
-    support_levels: Optional[pd.Series] = None,
-    resistance_levels: Optional[pd.Series] = None,
-    touches_support: Optional[pd.Series] = None,
-    touches_resist: Optional[pd.Series] = None,
+    support_levels: pd.Series | None = None,
+    resistance_levels: pd.Series | None = None,
+    touches_support: pd.Series | None = None,
+    touches_resist: pd.Series | None = None,
     # sinais
-    entries: Optional[pd.Series] = None,
-    exits: Optional[pd.Series] = None,
-    title: Optional[str] = None,
+    entries: pd.Series | None = None,
+    exits: pd.Series | None = None,
+    title: str | None = None,
 ):
     """Compositor: monta um gráfico completo com preço, pivôs, S/R e entradas/saídas."""
     fig = plot_price(close, title=title)

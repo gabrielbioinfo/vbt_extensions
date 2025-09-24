@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -34,9 +34,9 @@ def _build_fib_levels_for_leg(
     low: pd.Series,
     high: pd.Series,
     direction_up: pd.Series,
-    ratios: List[float],
-    ext: Optional[List[float]],
-) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+    ratios: list[float],
+    ext: list[float] | None,
+) -> tuple[pd.DataFrame, pd.DataFrame | None]:
     """Calcula níveis por barra, respeitando a direção da perna ativa."""
     # garantias
     low = low.astype(float)
@@ -48,7 +48,7 @@ def _build_fib_levels_for_leg(
     # - down-leg (high->low): fib_r = low + r*(high-low)
     rng = (high - low).astype(float)
 
-    fib_cols: Dict[str, pd.Series] = {}
+    fib_cols: dict[str, pd.Series] = {}
     for r in ratios:
         name = f"fib_{round(r * 100, 1):g}".replace(".0", "")
         up_val = high - r * rng
@@ -71,7 +71,7 @@ def _build_fib_levels_for_leg(
 
     ext_df = None
     if ext and len(ext) > 0:
-        ext_cols: Dict[str, pd.Series] = {}
+        ext_cols: dict[str, pd.Series] = {}
         # extensões:
         # - up-leg: ext_k = high + (k-1)*rng
         # - down-leg: ext_k = low - (k-1)*rng
@@ -113,7 +113,7 @@ class FIB_RETRACEMENT:
         is_bottom: pd.Series,
         *,
         ratios: Iterable[float] = (0.236, 0.382, 0.5, 0.618, 0.786),
-        ext: Optional[Iterable[float]] = (1.272, 1.618),
+    ext: Iterable[float] | None = (1.272, 1.618),
     ) -> RetracementResult:
         # validações/alinhos
         close = close.astype(float)

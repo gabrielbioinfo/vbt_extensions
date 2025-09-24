@@ -1,6 +1,5 @@
 # vbt_extensions/ind/trend_line.py
-"""
-Trend lines (suporte/resistência) por janela deslizante — pandas-first.
+"""Trend lines (suporte/resistência) por janela deslizante — pandas-first.
 
 Mantém o núcleo Numba do seu código, mas expõe uma API legível:
 - Série da linha de suporte em PREÇO (support_level)
@@ -21,7 +20,7 @@ Ideia:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -138,10 +137,10 @@ class TrendLineResult:
     resist_level: pd.Series  # preço da linha de resistência no candle t
     support_slope: pd.Series  # slope da linha de suporte (útil p/ classificar tendência)
     resist_slope: pd.Series
-    touch_support: Optional[pd.Series] = None  # True quando Low toca/abaixo (com tolerância)
-    touch_resist: Optional[pd.Series] = None  # True quando High toca/acima (com tolerância)
-    break_up: Optional[pd.Series] = None  # True quando Close cruza ACIMA da resistência
-    break_down: Optional[pd.Series] = None  # True quando Close cruza ABAIXO do suporte
+    touch_support: pd.Series | None = None  # True quando Low toca/abaixo (com tolerância)
+    touch_resist: pd.Series | None = None  # True quando High toca/acima (com tolerância)
+    break_up: pd.Series | None = None  # True quando Close cruza ACIMA da resistência
+    break_down: pd.Series | None = None  # True quando Close cruza ABAIXO do suporte
 
 
 class TREND_LINE:

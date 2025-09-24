@@ -1,5 +1,14 @@
+
+"""Detecção de topos e fundos em séries temporais usando scipy.signal.find_peaks.
+
+Este módulo fornece:
+- Classe PeaksResult para encapsular resultados de detecção de picos.
+- Funções auxiliares para suavização e detecção de picos.
+- Classe PEAKS_SCIPY para interface pandas-first e parâmetros flexíveis.
+"""
+
 from dataclasses import dataclass
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -18,16 +27,16 @@ class PeaksResult:
     is_bottom: pd.Series
     swing_high: pd.Series
     swing_low: pd.Series
-    peak_prominence: Optional[pd.Series] = None
-    peak_width: Optional[pd.Series] = None
-    peak_height: Optional[pd.Series] = None
+    peak_prominence: pd.Series | None = None
+    peak_width: pd.Series | None = None
+    peak_height: pd.Series | None = None
 
 
 def _smooth_series(
     s: pd.Series,
-    smooth: Optional[Literal["ema", "sma"]] = None,
+    smooth: Literal["ema", "sma"] | None = None,
     smooth_window: int = 5,
-    ema_alpha: Optional[float] = None,
+    ema_alpha: float | None = None,
 ) -> pd.Series:
     s = s.astype(float)
     if smooth is None:
@@ -43,10 +52,10 @@ def _smooth_series(
 def _run_find_peaks(
     y: pd.Series,
     *,
-    prominence: Optional[Union[float, Tuple[float, float]]] = None,
-    distance: Optional[int] = None,
-    width: Optional[Union[float, Tuple[float, float]]] = None,
-    height: Optional[Union[float, Tuple[float, float]]] = None,
+    prominence: Union[float, Tuple[float, float]] | None = None,
+    distance: int | None = None,
+    width: Union[float, Tuple[float, float]] | None = None,
+    height: Union[float, Tuple[float, float]] | None = None,
 ) -> Tuple[np.ndarray, dict]:
     """Wrapper leve para find_peaks trabalhando com Series."""
     x = y.values.astype(float)
@@ -79,19 +88,19 @@ class PEAKS_SCIPY:
         source_series: pd.Series,
         *,
         # pré-processamento (opcional)
-        smooth: Optional[Literal["ema", "sma"]] = None,
+        smooth: Literal["ema", "sma"] | None = None,
         smooth_window: int = 5,
-        ema_alpha: Optional[float] = None,
+        ema_alpha: float | None = None,
         # parâmetros find_peaks topos
-        top_prominence: Optional[Union[float, Tuple[float, float]]] = None,
-        top_distance: Optional[int] = None,
-        top_width: Optional[Union[float, Tuple[float, float]]] = None,
-        top_height: Optional[Union[float, Tuple[float, float]]] = None,
+        top_prominence: Union[float, Tuple[float, float]] | None = None,
+        top_distance: int | None = None,
+        top_width: Union[float, Tuple[float, float]] | None = None,
+        top_height: Union[float, Tuple[float, float]] | None = None,
         # parâmetros find_peaks fundos (em -series)
-        bottom_prominence: Optional[Union[float, Tuple[float, float]]] = None,
-        bottom_distance: Optional[int] = None,
-        bottom_width: Optional[Union[float, Tuple[float, float]]] = None,
-        bottom_height: Optional[Union[float, Tuple[float, float]]] = None,
+        bottom_prominence: Union[float, Tuple[float, float]] | None = None,
+        bottom_distance: int | None = None,
+        bottom_width: Union[float, Tuple[float, float]] | None = None,
+        bottom_height: Union[float, Tuple[float, float]] | None = None,
     ) -> PeaksResult:
         if not isinstance(source_series, pd.Series):
             raise TypeError("source_series deve ser pd.Series")
@@ -129,7 +138,7 @@ class PEAKS_SCIPY:
         swing_low = s.where(is_bottom).ffill()
 
         # métricas opcionalmente expostas (prominence/width/height)
-        def _to_series(arr: Optional[np.ndarray], default_nan=True) -> Optional[pd.Series]:
+        def _to_series(arr: np.ndarray | None, default_nan=True) -> pd.Series | None:
             if arr is None:
                 return None
             out = pd.Series(np.nan if default_nan else 0.0, index=idx, dtype=float)

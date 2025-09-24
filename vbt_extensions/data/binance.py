@@ -3,7 +3,7 @@
 
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -53,7 +53,7 @@ def binance_download(params: BinanceDownloadParams) -> "pd.DataFrame":
     if params.client is None:
         raise ValueError("BinanceDownloadParams.client não pode ser None.")
 
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
 
     for attempt in range(1, params.retries + 1):
         try:
